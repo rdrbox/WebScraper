@@ -1,4 +1,4 @@
-import requests, json
+import requests
 
 res = requests.get(input('Input the URL:'))
 
