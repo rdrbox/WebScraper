@@ -1,10 +1,20 @@
+import re
+
 import requests
+import re
 
-res = requests.get(input('Input the URL:'))
+from bs4 import BeautifulSoup
 
-quote = res.json()
+url = input('Input the URL:')
+ok_status = 200
 
-if quote.get('content') is None:
-    print('Invalid quote resource!')
+if re.search('imdb.com/title', url):
+    r = requests.get(url, headers={'Accept-Language': 'en-US,en;q=0.5'})
+    if r.status_code == ok_status:
+        soup = BeautifulSoup(r.content, 'html.parser')
+        title = soup.find('h1').text
+        description = soup.find('span', {'data-testid': 'plot-l'}).text
+
+        print({"title": title, "description": description})
 else:
-    print(quote.get('content'))
+    print('Invalid movie page!')
