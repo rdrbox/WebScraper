@@ -1,34 +1,73 @@
 import requests
-import string, re
+import string
+import re, os
+import shutil
 
 from bs4 import BeautifulSoup
 
-url = 'https://www.nature.com/nature/articles?sort=PubDate&year=2020&page=3'
-ok_status = 200
 
-r = requests.get(url)
-
-if r.status_code == ok_status:
-    soup = BeautifulSoup(r.content, 'html.parser')
-    for item in soup.findAll('li', {'class': 'app-article-list-row__item'}):
-        article_type = item.find('span', {'data-test': 'article.type'}).text
-        if article_type.strip() == 'News':
-            url = item.find('a', {'data-track-action': 'view article'})['href']
-            req = requests.get(f'https://www.nature.com{url}')
-            if req.status_code == ok_status:
-                soup_news = BeautifulSoup(req.content, 'html.parser')
-                main_content = soup_news.find('div', {'class': 'c-article-body main-content'}).text
-                title = soup_news.find('h1').text.strip()
-
-                for i in title:
-                    if i in string.punctuation:
-                        title = title.replace(i, '')
-
-                new_title = re.sub(r'\s', '_', title)
-
-            with open(f"{new_title}.txt", "wb") as f:
-                f.write(main_content.encode('utf-8'))
+def clear():
+    with os.scandir('.') as it:
+        for entry in it:
+            if not entry.name.startswith(('.', '_')) and entry.is_dir():
+                if re.match('Page', entry.name):
+                    path = os.path.join(os.path.abspath(os.path.dirname(__file__)), entry.name)
+                    shutil.rmtree(path)
 
 
-else:
-    print('The URL returned', r.status_code)
+def soup_obj(url_, ok_status=200):
+    r_ = requests.get(url_)
+    if r_.status_code == ok_status:
+        return BeautifulSoup(r_.content, 'html.parser')
+    return r_.status_code
+
+
+def get_page_list_posts(soup_):
+    return soup_.findAll('li', {'class': 'app-article-list-row__item'})
+
+
+def get_link_list_posts_type(list_post_, type_post):
+    l_link = []
+    for item in list_post_:
+        article_type = item.find('span', {'data-test': 'article.type'}).text.strip()
+        if article_type == type_post:
+            url_ = item.find('a', {'data-track-action': 'view article'})['href']
+            l_link.append(f'https://www.nature.com{url_}')
+
+    return l_link
+
+
+def get_title_content_post(soup_):
+    content = soup_.find('div', {'class': 'c-article-body main-content'}).text
+    title = soup_.find('h1').text.strip()
+    return title, content
+
+
+def new_file_name(title):
+    for el in title:
+        if el in string.punctuation:
+            title = title.replace(i, '')
+
+    return re.sub(r'\s', '_', title)
+
+
+if __name__ == '__main__':
+    clear()
+    page = input()
+    post_type = input()
+
+    for i in range(1, int(page) + 1):
+        os.mkdir(f'Page_{i}')
+        url = f'https://www.nature.com/nature/articles?sort=PubDate&year=2020&page={i}'
+        soup = soup_obj(url)
+        list_post = get_page_list_posts(soup)
+        list_link = get_link_list_posts_type(list_post, post_type)
+        if len(list_link) == 0:
+            continue
+
+        for link in list_link:
+            soup_link = soup_obj(link)
+            title_link, content_link = get_title_content_post(soup_link)
+            file_name = new_file_name(title_link)
+            with open(f"./Page_{i}/{file_name}.txt", "wb") as f:
+                f.write(content_link.encode('utf-8'))
